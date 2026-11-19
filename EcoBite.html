@@ -1,0 +1,832 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EcoBite Integrated Dashboard</title>
+    <!-- Load Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Load Font Awesome for Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <!-- Load Typed.js for the animation -->
+    <script src="https://cdn.jsdelivr.net/npm/typed.js@2.0.12"></script>
+    
+    <style>
+        /* Custom Styles for better visual appeal */
+        body { font-family: 'Inter', sans-serif; }
+        .glass-effect {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        .btn-base {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        .btn-success { background: #10b981; color: white; }
+        .btn-danger { background: #ef4444; color: white; }
+        .btn-primary { background: #3b82f6; color: white; }
+        .btn-base:hover { transform: translateY(-2px); box-shadow: 0 6px 12px rgba(0, 0, 0, 0.2); }
+        .modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.6);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s ease;
+        }
+        .modal.active {
+            opacity: 1;
+            pointer-events: auto;
+        }
+        .modal-content {
+            transform: translateY(-20px);
+            transition: transform 0.3s ease;
+        }
+        .modal.active .modal-content {
+            transform: translateY(0);
+        }
+        .anomaly-row {
+            transition: background-color 0.3s ease;
+            animation: pulse-red 1.5s infinite alternate;
+        }
+        @keyframes pulse-red {
+            from { background-color: #fee2e2; } /* Red-100 */
+            to { background-color: #fca5a5; }   /* Red-300 */
+        }
+        .header.hidden {
+            display: none;
+        }
+        .role-btn {
+            background-color: #f3f4f6;
+            color: #4b5563;
+            border: 2px solid transparent;
+        }
+        .role-btn.selected {
+            background-color: #d1fae5;
+            color: #059669;
+            border: 2px solid #10b981;
+            font-weight: 600;
+        }
+        .role-btn:hover:not(.selected) {
+            background-color: #e5e7eb;
+        }
+    </style>
+</head>
+<body class="min-h-screen bg-gray-100 antialiased">
+
+    <!-- Global Header (Hidden initially for login screen) -->
+    <div class="header bg-white shadow-md">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
+            <h1 class="text-3xl font-bold text-green-600">🌱 EcoBite</h1>
+            <nav id="nav-menu">
+                <!-- Navigation links will be added here by JS after login -->
+            </nav>
+        </div>
+    </div>
+
+    <!-- Main Content Area where views switch -->
+    <main id="app-content" class="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8"></main>
+
+    <!-- Modals -->
+    <!-- Authentication/Role Selection Modal -->
+    <div id="auth-modal" class="modal">
+        <div class="modal-content bg-white p-8 rounded-2xl shadow-2xl max-w-lg w-full">
+            <h2 class="text-3xl font-bold text-gray-800 mb-6">Select Your Role</h2>
+            
+            <p class="text-gray-600 mb-4">Please choose the role that best describes your organization or use case. This determines your dashboard features.</p>
+            
+            <div id="role-selection-grid" class="grid grid-cols-2 gap-4">
+                <!-- Role buttons will be rendered here -->
+            </div>
+
+            <p id="role-error" class="text-red-500 text-sm mt-4 hidden">Please select a role to continue.</p>
+
+            <button id="confirm-role-btn" class="btn-base btn-success w-full mt-8" onclick="confirmRole()">
+                Continue to Dashboard
+            </button>
+            <button class="btn-base bg-gray-200 text-gray-700 w-full mt-3" onclick="closeModal('auth-modal');">Cancel</button>
+        </div>
+    </div>
+    
+    <!-- Other Modals (Redeem, Earn, History) -->
+    <div id="redeem-modal" class="modal">
+        <div class="modal-content bg-white p-6 rounded-xl shadow-2xl max-w-sm w-full">
+            <h2 class="text-2xl font-semibold mb-4">Redeem EcoPoints</h2>
+            <p class="mb-6 text-gray-600">Redeem your points for exciting rewards!</p>
+            <div class="mb-4">
+                <button class="btn-base btn-success w-full" onclick="redeemPoints()">
+                    Redeem 50 Points for Coffee Coupon
+                </button>
+            </div>
+            <button class="btn-base bg-gray-200 text-gray-700 w-full" onclick="closeModal('redeem-modal')">Cancel</button>
+        </div>
+    </div>
+    
+    <div id="earn-modal" class="modal">
+        <div class="modal-content bg-white p-6 rounded-xl shadow-2xl max-w-sm w-full">
+            <h2 class="text-2xl font-semibold mb-4">Earn EcoPoints</h2>
+            <p class="mb-6 text-gray-600">Complete these actions to earn points:</p>
+            <div class="space-y-3">
+                <div class="p-3 border rounded-lg flex justify-between items-center">
+                    <div>
+                        <h4 class="font-medium">Recycle Items</h4>
+                        <p class="text-sm text-gray-500">Earn 25 points for recycling 5 items</p>
+                    </div>
+                    <button class="btn-base bg-green-500 text-white text-sm" onclick="earnPoints('recycle')">Earn</button>
+                </div>
+                <div class="p-3 border rounded-lg flex justify-between items-center">
+                    <div>
+                        <h4 class="font-medium">Use Reusable Bags</h4>
+                        <p class="text-sm text-gray-500">Earn 15 points for using reusable bags</p>
+                    </div>
+                    <button class="btn-base bg-green-500 text-white text-sm" onclick="earnPoints('bags')">Earn</button>
+                </div>
+            </div>
+            <button class="btn-base bg-gray-200 text-gray-700 w-full mt-6" onclick="closeModal('earn-modal')">Close</button>
+        </div>
+    </div>
+
+    <div id="history-modal" class="modal">
+        <div class="modal-content bg-white p-6 rounded-xl shadow-2xl max-w-lg w-full">
+            <h2 class="text-2xl font-semibold mb-4">Activity History</h2>
+            <div class="mb-4 flex space-x-3">
+                <button class="filter-btn active-filter" data-filter="all" onclick="filterHistory('all')">All</button>
+                <button class="filter-btn" data-filter="earned" onclick="filterHistory('earned')">Earned</button>
+                <button class="filter-btn" data-filter="redeemed" onclick="filterHistory('redeemed')">Redeemed</button>
+            </div>
+            <div id="history-list" class="space-y-2 max-h-96 overflow-y-auto p-2 bg-gray-50 rounded-lg">
+                <!-- History will be loaded by JavaScript -->
+            </div>
+            <button class="btn-base bg-gray-200 text-gray-700 w-full mt-6" onclick="closeModal('history-modal')">Close</button>
+        </div>
+    </div>
+
+
+    <script>
+        // Global App State
+        let currentPage = 'login'; // Start on login page
+        let userType = null; // User role starts as null, must be set via login
+        let selectedRole = null; // Role chosen in the auth modal
+        
+        // Mock authentication data
+        const MOCK_CREDENTIALS = {
+            username: 'user@ecobite.com',
+            password: 'password123'
+        };
+
+        // --- Sensor Data Parsing and Initialization ---
+
+        // The raw data imported from deepseek_csv_20251124_f08a46.txt
+        const rawSensorData = `Sensor_ID,Crop_Type,Soil_Moisture (SMT-100),Temperature (TMP-36),Humidity (HMD-60),pH (PH-SENSE v2),Status
+Sensor_1,Corn,10.84,19.14,70.85,5.76,Abnormal
+Sensor_2,Wheat,25.6,12.3,45.83,6.08,Abnormal
+Sensor_3,Rice,15.55,10.5,83.34,4.53,Abnormal
+Sensor_4,Rice,41.05,27.85,52.29,,Normal
+Sensor_5,Tomato,32.2,20.63,66.38,6.32,Normal
+Sensor_1,Tomato,26.46,33.43,40.44,6.38,Normal
+Sensor_2,Potato,15.12,33.39,44.59,5.64,Normal
+Sensor_3,Tomato,31.13,25.41,54.69,6.61,Normal
+Sensor_4,Rice,15.93,32.26,43.83,5.72,Normal
+Sensor_5,Tomato,38.97,25,65.62,7.18,Normal
+Sensor_1,Corn,47.62,29.92,65.16,7.16,Normal
+Sensor_2,Wheat,21.72,31.72,41.08,5.98,Normal
+Sensor_3,Corn,17.5,8.7,89.51,4.52,Abnormal
+Sensor_4,Tomato,36.28,25.23,54.5,7.22,Normal
+Sensor_5,Potato,18.14,30.66,25.8,6.48,Abnormal
+Sensor_1,Corn,35.71,26.21,67.78,7.33,Normal
+Sensor_2,Corn,27.57,31.97,45.89,5.58,Normal
+Sensor_3,Corn,35.01,25.78,68.97,6.15,Normal
+Sensor_4,Rice,3.2,26.44,58.8,7.3,Abnormal
+Sensor_5,Rice,42.38,24.41,66.8,7.16,Normal
+Sensor_1,Tomato,36.73,26.78,61.85,6.81,Normal
+Sensor_2,Tomato,41.7,25.29,62.09,6.06,Normal
+Sensor_3,Rice,42.59,26.51,52.2,6.29,Normal
+Sensor_4,Wheat,14.45,17.47,73.39,5.01,Abnormal
+Sensor_5,Rice,31.49,27.51,60.05,6.79,Normal
+Sensor_1,Rice,30.8,21.08,52.52,6.12,Normal
+Sensor_2,Corn,41.97,29.64,63.04,6.07,Normal
+Sensor_3,Tomato,48.03,25.12,53.09,7.46,Normal
+Sensor_4,Rice,39.38,28.41,64.75,6.84,Normal
+Sensor_5,Corn,35.93,12.8,68.88,6.25,Abnormal
+Sensor_1,Potato,42.39,25.07,59.36,6.34,Normal
+Sensor_2,Corn,55.1,26.64,59.6,,Abnormal
+Sensor_3,Wheat,41.77,22.27,53.05,,Normal
+Sensor_4,Corn,39.56,27.72,54.52,7.4,Normal
+Sensor_5,Potato,20.19,33.84,43.06,6.21,Normal
+Sensor_1,Wheat,37.13,23.85,67.22,6.07,Normal
+Sensor_2,Wheat,26.5,33.2,38.46,6,Normal
+Sensor_3,Rice,47.99,9.2,56.42,7.03,Abnormal
+Sensor_4,Wheat,26.82,33.13,42.07,6.03,Normal
+Sensor_5,Wheat,21.02,32.91,28.5,6.02,Abnormal
+`;
+
+        /**
+         * Parses the CSV data and generates synthesized abnormality descriptions 
+         * based on standard agricultural thresholds for visualization.
+         */
+        function parseCropData(csv) {
+            const lines = csv.trim().split('\n');
+            if (lines.length < 2) return [];
+
+            const headers = lines[0].split(',').map(h => h.trim());
+            const data = [];
+
+            for (let i = 1; i < lines.length; i++) {
+                const values = lines[i].split(',');
+                if (values.length !== headers.length) continue; 
+
+                const row = {};
+                headers.forEach((header, index) => {
+                    row[header] = values[index].trim();
+                });
+
+                const moisture = parseFloat(row['Soil_Moisture (SMT-100)']);
+                const temperature = parseFloat(row['Temperature (TMP-36)']);
+                const status = row['Status'];
+                const pH = row['pH (PH-SENSE v2)'];
+                let condition = status;
+                let reason = [];
+
+                if (status === 'Abnormal') {
+                    // Check for common sensor issues to give more context
+                    if (moisture < 15) reason.push('Critical Low Moisture');
+                    else if (moisture < 25) reason.push('Low Moisture');
+
+                    if (temperature < 15) reason.push('Low Temperature');
+                    else if (temperature > 32) reason.push('High Temperature');
+
+                    if (pH === '') reason.push('Missing pH Value');
+                    
+                    if (reason.length > 0) {
+                        condition = `Abnormality: ${reason.join(' / ')}`;
+                    } else {
+                        // Catching generic 'Abnormal' flags with no clear metric issue
+                        condition = 'Abnormality: Review Required';
+                    }
+                }
+                
+                data.push({
+                    id: i,
+                    field: row['Sensor_ID'],
+                    crop: row['Crop_Type'],
+                    moisture: moisture.toFixed(2), // Format to 2 decimal places
+                    temperature: temperature.toFixed(2),
+                    condition: condition,
+                    pH: pH === '' ? 'N/A' : parseFloat(pH).toFixed(2)
+                });
+            }
+            return data;
+        }
+
+        const mockCropData = parseCropData(rawSensorData);
+
+        // --- Other Global State and Mock Data ---
+        
+        const features = {
+            'restaurant': ['Manage food donations', 'Track inventory', 'Schedule pickups', 'View history'],
+            'household': ['Find food resources', 'Track usage', 'Get nutrition info', 'Connect community'],
+            'foodbank': ['Manage distributions', 'Coordinate partners', 'Track inventory', 'Generate reports'],
+            'farmer': ['List produce', 'Coordinate donations', 'Track harvest', 'Monitor Crops']
+        };
+
+        // --- Points Tracker State & Logic ---
+
+        let currentBalance = 150;
+        let totalEarned = 450;
+        let totalRedeemed = 300;
+        let pendingBalance = 0;
+        let expiringSoon = 25;
+        let currentFilter = 'all';
+        let activityData = [
+            { id: 1, type: 'earned', description: 'Recycled 5 items', points: 25, timestamp: new Date(Date.now() - 3600000), icon: 'fas fa-recycle', color: 'text-green-600' },
+            { id: 2, type: 'redeemed', description: 'Redeemed 50 points for coffee coupon', points: -50, timestamp: new Date(Date.now() - 172800000), icon: 'fas fa-gift', color: 'text-yellow-600' },
+            { id: 3, type: 'earned', description: 'Completed sustainability quiz', points: 10, timestamp: new Date(Date.now() - 259200000), icon: 'fas fa-graduation-cap', color: 'text-blue-600' }
+        ];
+
+        // Helper function to format time
+        function timeAgo(date) {
+            const seconds = Math.floor((new Date() - date) / 1000);
+            let interval = seconds / 31536000;
+            if (interval > 1) return Math.floor(interval) + " years ago";
+            interval = seconds / 2592000;
+            if (interval > 1) return Math.floor(interval) + " months ago";
+            interval = seconds / 86400;
+            if (interval > 1) return Math.floor(interval) + " days ago";
+            interval = seconds / 3600;
+            if (interval > 1) return Math.floor(interval) + " hours ago";
+            interval = seconds / 60;
+            if (interval > 1) return Math.floor(interval) + " minutes ago";
+            return Math.floor(seconds) + " seconds ago";
+        }
+        
+        // Global functions for modal control
+        function showModal(modalId) { 
+            document.getElementById(modalId)?.classList.add('active'); 
+        }
+        function closeModal(modalId) { 
+            document.getElementById(modalId)?.classList.remove('active'); 
+        }
+
+        // --- Custom Alert Box (Replaces alert()) ---
+        function alertBox(message, type = 'info') {
+            const container = document.getElementById('app-content');
+            let colorClass = 'bg-blue-100 border-blue-500 text-blue-700';
+            if (type === 'success') colorClass = 'bg-green-100 border-green-500 text-green-700';
+            if (type === 'error') colorClass = 'bg-red-100 border-red-500 text-red-700';
+            
+            const alertDiv = document.createElement('div');
+            alertDiv.className = `fixed top-20 right-5 p-4 rounded-lg border-l-4 shadow-lg z-50 transition-transform duration-500 transform translate-x-full ${colorClass}`;
+            alertDiv.innerHTML = `<p class="font-semibold">${message}</p>`;
+
+            document.body.appendChild(alertDiv);
+            
+            // Animate in
+            setTimeout(() => alertDiv.classList.remove('translate-x-full'), 10);
+            
+            // Animate out and remove
+            setTimeout(() => {
+                alertDiv.classList.add('translate-x-full');
+                setTimeout(() => alertDiv.remove(), 500);
+            }, 3000);
+        }
+        
+        // --- Points Tracker Logic ---
+
+        function updatePointsUI() {
+            const balanceEl = document.getElementById('balance-amount');
+            if(balanceEl) balanceEl.textContent = currentBalance;
+            const earnedEl = document.getElementById('total-earned');
+            if(earnedEl) earnedEl.textContent = totalEarned;
+            const redeemedEl = document.getElementById('total-redeemed');
+            if(redeemedEl) redeemedEl.textContent = totalRedeemed;
+            const pendingEl = document.getElementById('pending-balance');
+            if(pendingEl) pendingEl.textContent = pendingBalance;
+            const expiringEl = document.getElementById('expiring-soon');
+            if(expiringEl) expiringEl.textContent = expiringSoon;
+
+            const updateTimeEl = document.getElementById('update-time');
+            if(updateTimeEl) {
+                updateTimeEl.textContent = timeAgo(new Date());
+                // Add a visual pulse to indicate refresh
+                updateTimeEl.classList.add('pulse-green');
+                setTimeout(() => updateTimeEl.classList.remove('pulse-green'), 2000);
+            }
+        }
+
+        function refreshBalance() {
+            // Simulate API refresh
+            console.log('Refreshing balance...');
+            updatePointsUI();
+        }
+
+        function renderActivityList(targetId, data) {
+            const listEl = document.getElementById(targetId);
+            if (!listEl) return;
+
+            const html = data
+                .sort((a, b) => b.timestamp - a.timestamp) // Sort by most recent
+                .filter(item => currentFilter === 'all' || item.type === currentFilter)
+                .map(item => `
+                    <div class="activity-item flex justify-between items-center p-4 bg-white rounded-lg shadow-sm">
+                        <div class="flex items-center">
+                            <i class="${item.icon} text-lg w-6 ${item.color}"></i>
+                            <span class="ml-4 font-medium">${item.description}</span>
+                        </div>
+                        <span class="font-bold ${item.points > 0 ? 'text-green-600' : 'text-red-600'}">
+                            ${item.points > 0 ? '+' : ''}${item.points}
+                        </span>
+                    </div>
+                `).join('');
+            listEl.innerHTML = html;
+        }
+
+        function filterHistory(filterType) {
+            currentFilter = filterType;
+            // Update filter buttons appearance
+            document.querySelectorAll('#history-modal .filter-btn').forEach(btn => {
+                btn.classList.remove('active-filter');
+                if (btn.dataset.filter === filterType) {
+                    btn.classList.add('active-filter');
+                }
+            });
+            renderActivityList('history-list', activityData);
+        }
+
+        function redeemPoints() {
+            const pointsToRedeem = 50;
+            if (currentBalance >= pointsToRedeem) {
+                currentBalance -= pointsToRedeem;
+                totalRedeemed += pointsToRedeem;
+                activityData.push({
+                    id: Date.now(),
+                    type: 'redeemed',
+                    description: 'Redeemed coffee coupon',
+                    points: -pointsToRedeem,
+                    timestamp: new Date(),
+                    icon: 'fas fa-mug-hot',
+                    color: 'text-yellow-600'
+                });
+                updatePointsUI();
+                closeModal('redeem-modal');
+                alertBox('Points redeemed successfully!', 'success');
+            } else {
+                alertBox('Insufficient balance.', 'error');
+            }
+        }
+
+        function earnPoints(action) {
+            let points = 0;
+            let description = '';
+            if (action === 'recycle') {
+                points = 25;
+                description = 'Recycled items';
+            } else if (action === 'bags') {
+                points = 15;
+                description = 'Used reusable bags';
+            }
+
+            if (points > 0) {
+                currentBalance += points;
+                totalEarned += points;
+                activityData.push({
+                    id: Date.now(),
+                    type: 'earned',
+                    description: description,
+                    points: points,
+                    timestamp: new Date(),
+                    icon: 'fas fa-leaf',
+                    color: 'text-green-600'
+                });
+                updatePointsUI();
+                closeModal('earn-modal');
+                alertBox(`You earned ${points} EcoPoints!`, 'success');
+            }
+        }
+        
+        // --- Authentication Logic ---
+
+        function selectRole(role) {
+            selectedRole = role;
+            // Highlight the selected button
+            document.querySelectorAll('.role-btn').forEach(btn => {
+                btn.classList.remove('selected');
+            });
+            document.getElementById(`role-${role}`).classList.add('selected');
+            document.getElementById('role-error').classList.add('hidden'); // Clear error
+        }
+
+        function renderRoleButton(role, label, iconClass) {
+            return `
+                <button id="role-${role}" onclick="selectRole('${role}')" 
+                        class="role-btn p-4 rounded-xl transition duration-150 transform hover:scale-[1.02] shadow-lg flex flex-col items-center justify-center text-center space-y-2">
+                    <i class="${iconClass} text-4xl text-green-600"></i>
+                    <p class="font-semibold text-lg">${label}</p>
+                </button>
+            `;
+        }
+        
+        function showRoleSelectionModal() {
+            // Render roles inside the modal
+            const rolesHtml = `
+                ${renderRoleButton('household', 'Household', 'fas fa-house')}
+                ${renderRoleButton('restaurant', 'Restaurant', 'fas fa-utensils')}
+                ${renderRoleButton('farmer', 'Farmer', 'fas fa-tractor')}
+                ${renderRoleButton('foodbank', 'Foodbank', 'fas fa-warehouse')}
+            `;
+            document.getElementById('role-selection-grid').innerHTML = rolesHtml;
+            // Reset state
+            selectedRole = null;
+            document.getElementById('role-error').classList.add('hidden');
+            showModal('auth-modal');
+        }
+
+        function confirmRole() {
+            if (!selectedRole) {
+                document.getElementById('role-error').classList.remove('hidden');
+                return;
+            }
+            
+            userType = selectedRole;
+            closeModal('auth-modal');
+            alertBox(`Logged in as ${userType.charAt(0).toUpperCase() + userType.slice(1)}.`, 'success');
+            navigate('dashboard');
+        }
+
+        function handleLogin() {
+            const usernameInput = document.getElementById('username-input');
+            const passwordInput = document.getElementById('password-input');
+            const loginError = document.getElementById('login-error');
+
+            // Simple mock validation
+            if (usernameInput.value === MOCK_CREDENTIALS.username && passwordInput.value === MOCK_CREDENTIALS.password) {
+                loginError.classList.add('hidden');
+                // Credentials are correct, now show role selection
+                showRoleSelectionModal();
+            } else {
+                loginError.textContent = 'Invalid username or password. Use: user@ecobite.com / password123';
+                loginError.classList.remove('hidden');
+            }
+        }
+
+        function handleLogout() {
+            userType = null;
+            currentPage = 'login';
+            alertBox('Logged out successfully.', 'info');
+            renderApp();
+        }
+
+        function renderLogin() {
+            // Updated login page to include username and password fields
+            return `
+                <div class="flex items-center justify-center min-h-screen bg-gray-100 -mt-[80px] p-4">
+                    <div class="bg-white p-10 rounded-2xl shadow-2xl max-w-sm w-full text-center border-t-8 border-green-500">
+                        <h2 class="text-3xl font-extrabold text-gray-800 mb-2">Login to <span class="text-green-600">EcoBite</span></h2>
+                        <p class="text-gray-600 mb-6">Enter your credentials to access your dashboard.</p>
+                        
+                        <div class="space-y-4 text-left">
+                            <div class="relative">
+                                <i class="fas fa-envelope absolute top-3 left-3 text-gray-400"></i>
+                                <input type="email" id="username-input" placeholder="Username (email)" value="${MOCK_CREDENTIALS.username}"
+                                       class="w-full p-3 pl-10 border border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500">
+                            </div>
+                            <div class="relative">
+                                <i class="fas fa-lock absolute top-3 left-3 text-gray-400"></i>
+                                <input type="password" id="password-input" placeholder="Password" value="${MOCK_CREDENTIALS.password}"
+                                       class="w-full p-3 pl-10 border border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500">
+                            </div>
+                            
+                            <p id="login-error" class="text-red-500 text-sm hidden"></p>
+                            
+                            <button onclick="handleLogin()" class="btn-base btn-success w-full text-lg">
+                                <i class="fas fa-sign-in-alt mr-2"></i> Log In
+                            </button>
+                        </div>
+                        <p class="text-xs text-gray-400 mt-6">Mock credentials for testing: ${MOCK_CREDENTIALS.username} / ${MOCK_CREDENTIALS.password}</p>
+                    </div>
+                </div>
+            `;
+        }
+        
+        // --- View Rendering Functions (Dashboard, Points, Crop Health) ---
+
+        function navigate(page) {
+            currentPage = page;
+            renderApp();
+        }
+
+        function renderDashboard() {
+            const featuresHTML = features[userType].map(feature => 
+                `<div class="p-3 my-2 bg-gray-50 border-l-4 border-green-500 rounded-md shadow-sm">
+                    ${feature}
+                </div>`
+            ).join('');
+
+            return `
+                <div class="bg-white p-8 rounded-xl shadow-2xl max-w-2xl mx-auto">
+                    <h2 class="text-3xl font-extrabold text-gray-900">Welcome!</h2>
+                    <p class="text-gray-600 mt-2 text-lg">You are logged in as: <span class="font-semibold text-green-600">${userType.charAt(0).toUpperCase() + userType.slice(1)}</span> 🎉</p>
+
+                    <div class="mt-8 pt-4 border-t border-gray-200">
+                        <h3 class="text-xl font-semibold text-gray-800 mb-3">Available Features:</h3>
+                        <div id="role-features" class="space-y-2">${featuresHTML}</div>
+                    </div>
+
+                    <div class="mt-8 flex justify-center space-x-4">
+                        <button onclick="navigate('points')" class="btn-base bg-purple-600 text-white hover:bg-purple-700 transition duration-150">
+                            <i class="fas fa-coins mr-2"></i> Points Tracker
+                        </button>
+                        
+                        ${userType === 'farmer' ? `
+                            <button onclick="navigate('cropHealth')" class="btn-base btn-success hover:bg-green-700 transition duration-150">
+                                <i class="fas fa-seedling mr-2"></i> Monitor Crops
+                            </button>
+                        ` : ''}
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderPointsTracker() {
+            return `
+                <div class="min-h-[500px] bg-indigo-900/10 p-6 rounded-2xl">
+                    <div class="balance-card bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-2xl p-8 shadow-xl">
+                        <h2 class="text-2xl font-semibold">Your EcoPoints Balance</h2>
+                        <h1 id="balance-amount" class="text-6xl font-extrabold my-4">${currentBalance}</h1>
+                        <p class="text-indigo-200">Last updated: <span id="update-time" class="font-medium">...</span></p>
+                        <button class="btn-base bg-white text-indigo-700 font-bold mt-4 shadow-md" id="refresh-balance" onclick="refreshBalance()">
+                            <i class="fas fa-sync-alt mr-2"></i> Refresh Balance
+                        </button>
+                    </div>
+
+                    <!-- Stats Grid -->
+                    <div class="grid md:grid-cols-4 sm:grid-cols-2 gap-6 mt-6">
+                        <div class="bg-white p-5 rounded-xl shadow-lg text-center">
+                            <h3 class="text-lg font-medium text-gray-500">Total Earned</h3>
+                            <p id="total-earned" class="text-4xl font-bold text-green-600 mt-1">${totalEarned}</p>
+                        </div>
+                        <div class="bg-white p-5 rounded-xl shadow-lg text-center">
+                            <h3 class="text-lg font-medium text-gray-500">Total Redeemed</h3>
+                            <p id="total-redeemed" class="text-4xl font-bold text-yellow-600 mt-1">${totalRedeemed}</p>
+                        </div>
+                        <div class="bg-white p-5 rounded-xl shadow-lg text-center">
+                            <h3 class="text-lg font-medium text-gray-500">Pending</h3>
+                            <p id="pending-balance" class="text-4xl font-bold text-blue-600 mt-1">${pendingBalance}</p>
+                        </div>
+                        <div class="bg-white p-5 rounded-xl shadow-lg text-center">
+                            <h3 class="text-lg font-medium text-gray-500">Expiring Soon</h3>
+                            <p id="expiring-soon" class="text-4xl font-bold text-red-600 mt-1">${expiringSoon}</p>
+                        </div>
+                    </div>
+
+                    <!-- Quick Actions -->
+                    <div class="bg-white p-6 rounded-xl shadow-lg text-center mt-6 space-y-4">
+                        <h2 class="text-2xl font-semibold">Quick Actions</h2>
+                        <div class="flex flex-wrap justify-center gap-4">
+                            <button class="btn-base btn-success" onclick="showModal('earn-modal')">
+                                <i class="fas fa-plus-circle mr-2"></i> Earn Points
+                            </button>
+                            <button class="btn-base btn-primary" onclick="showModal('redeem-modal')">
+                                <i class="fas fa-gift mr-2"></i> Redeem Points
+                            </button>
+                            <button class="btn-base bg-gray-200 text-gray-700" onclick="showModal('history-modal')">
+                                <i class="fas fa-history mr-2"></i> View History
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Typed Text Animation -->
+                    <div class="bg-white p-6 rounded-xl shadow-lg text-center mt-6">
+                        <h2 id="typed-text" class="text-xl font-medium text-gray-700 min-h-[40px]"></h2>
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderCropHealth() {
+            // Use the data parsed from the uploaded CSV
+            const abnormalData = mockCropData.filter(row => row.condition.includes('Abnormality'));
+            const abnormalCount = abnormalData.length;
+
+            const tableRows = abnormalData.map(row => {
+                const rowClass = 'anomaly-row text-red-800'; // Apply the pulsing animation
+                
+                return `
+                    <tr class="${rowClass} hover:bg-red-200">
+                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">${row.field}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">${row.crop}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">${row.moisture}%</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">${row.temperature}°C</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">${row.pH}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm font-bold">${row.condition}</td>
+                    </tr>
+                `;
+            }).join('');
+
+            const alertBanner = abnormalCount > 0 ? `
+                <div id="crop-alert" class="p-5 mb-6 bg-red-100 border-l-8 border-red-500 text-red-800 rounded-xl shadow-xl animate-bounce-slow">
+                    <div class="flex items-center space-x-3">
+                        <i class="fas fa-exclamation-triangle text-3xl"></i>
+                        <div>
+                            <p class="font-bold text-xl uppercase">CRITICAL ANOMALY ALERT (${abnormalCount} Fields)</p>
+                            <p class="text-sm">Immediate review of the data table is recommended to address crop stress.</p>
+                        </div>
+                    </div>
+                </div>
+            ` : `
+                <div class="p-5 mb-6 bg-green-100 border-l-8 border-green-500 text-green-800 rounded-xl shadow-xl">
+                    <div class="flex items-center space-x-3">
+                        <i class="fas fa-check-circle text-3xl"></i>
+                        <div>
+                            <p class="font-bold text-xl">All Crops Normal</p>
+                            <p class="text-sm">No abnormalities detected in the last scan.</p>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            return `
+                <div class="bg-white p-8 rounded-xl shadow-2xl max-w-4xl mx-auto space-y-6">
+                    <div class="flex justify-between items-center border-b pb-4">
+                        <h2 class="text-3xl font-extrabold text-green-700">🌱 Crop Health Dashboard</h2>
+                        <button onclick="navigate('dashboard')" class="btn-base bg-gray-500 text-white hover:bg-gray-600 transition duration-150">
+                            &larr; Back to Dashboard
+                        </button>
+                    </div>
+
+                    ${alertBanner}
+
+                    <h3 class="text-xl font-semibold text-gray-800 mb-4">Anomaly Details (${abnormalCount} Records)</h3>
+                    
+                    <div class="overflow-x-auto shadow-lg rounded-lg border border-gray-200">
+                        <table class="min-w-full divide-y divide-gray-200">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Sensor ID</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Crop</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Moisture</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Temp</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">pH</th>
+                                    <th class="px-6 py-3 text-left text-xs font-bold text-red-600 uppercase tracking-wider">Condition</th>
+                                </tr>
+                            </thead>
+                            <tbody class="bg-white divide-y divide-gray-200">
+                                ${tableRows.length > 0 ? tableRows : `
+                                    <tr>
+                                        <td colspan="6" class="px-6 py-10 text-center text-lg text-gray-500 italic">No critical anomalies found.</td>
+                                    </tr>
+                                `}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            `;
+        }
+
+
+        function renderApp() {
+            const contentArea = document.getElementById('app-content');
+            const headerEl = document.querySelector('.header');
+            
+            // 1. Handle Login Screen
+            if (userType === null) {
+                headerEl.classList.add('hidden');
+                contentArea.innerHTML = renderLogin();
+                return; // Exit early for login page
+            }
+
+            // 2. If logged in, show header and render content
+            headerEl.classList.remove('hidden');
+
+            let contentHTML = '';
+            switch (currentPage) {
+                case 'dashboard':
+                    contentHTML = renderDashboard();
+                    break;
+                case 'points':
+                    contentHTML = renderPointsTracker();
+                    break;
+                case 'cropHealth':
+                    contentHTML = renderCropHealth();
+                    break;
+                default:
+                    contentHTML = renderDashboard();
+            }
+
+            contentArea.innerHTML = contentHTML;
+            
+            // 3. Post-render setup (Navigation update, Typed.js)
+            
+            // Update navigation links visibility
+            const navLinks = document.getElementById('nav-menu');
+            if (navLinks) {
+                navLinks.innerHTML = `
+                    <button onclick="navigate('dashboard')" class="text-gray-600 hover:text-green-600 font-medium px-3 py-2 rounded-lg transition duration-150 ${currentPage === 'dashboard' ? 'bg-gray-200' : ''}">Dashboard</button>
+                    <button onclick="navigate('points')" class="text-gray-600 hover:text-green-600 font-medium px-3 py-2 rounded-lg transition duration-150 ${currentPage === 'points' ? 'bg-gray-200' : ''}">Points Tracker</button>
+                    ${userType === 'farmer' ? 
+                        `<button onclick="navigate('cropHealth')" class="text-gray-600 hover:text-green-600 font-medium px-3 py-2 rounded-lg transition duration-150 ${currentPage === 'cropHealth' ? 'bg-gray-200' : ''}">Crop Monitoring</button>` : ''
+                    }
+                    <button onclick="handleLogout()" class="btn-base btn-danger text-sm ml-4">Logout</button>
+                `;
+            }
+
+            // Post-render setup for points tracker (Typed.js and UI update)
+            if (currentPage === 'points') {
+                updatePointsUI();
+                renderActivityList('activity-list', activityData);
+                // Initialize history modal content
+                renderActivityList('history-list', activityData);
+                
+                if (window.typedInstance) {
+                    window.typedInstance.destroy();
+                }
+                window.typedInstance = new Typed('#typed-text', {
+                    strings: ['Track your environmental impact.', 'Earn rewards for sustainability.', 'Make every bite count!'],
+                    typeSpeed: 50,
+                    backSpeed: 20,
+                    loop: true,
+                    showCursor: false,
+                });
+            }
+        }
+
+        // Initialize the application
+        document.addEventListener('DOMContentLoaded', () => {
+            renderApp(); // Renders the login page
+        });
+    </script>
+
+</body>
+</html>
